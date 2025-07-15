@@ -1,136 +1,132 @@
 import 'package:flutter/material.dart';
+import 'item.dart';
+import 'app_database.dart';
 
-void main() {
+late AppDatabase database;
 
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  database = await $FloorAppDatabase.databaseBuilder('todo.db').build();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  /*
-  String  getString( {  int a = 0, double b=0.0, bool c = false }){
-
-    return "hello world";
-
-  }*/
-
   @override
   Widget build(BuildContext context) {
-
-
-
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
+    return MaterialApp(home: ListPage());
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-
-  final String title;
-
+class ListPage extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<ListPage> createState() => _ListPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  double _counter = 0;
-  late TextEditingController _controller; //this is to read what was typed
-
-
-
-  var isChecked = false;
+class _ListPageState extends State<ListPage> {
+  final _itemController = TextEditingController();
+  final _quantityController = TextEditingController();
+  List<ToDoItem> _items = [];
 
   @override
-  void initState() { //similar to onloaded=
+  void initState() {
     super.initState();
-
-    _controller = TextEditingController(); //making _controller
+    _loadItems();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose(); // free the memory of what was typed
-  }
-
-  void _incrementCounter() {
+  void _loadItems() async {
+    final dao = database.toDoDao;
+    final list = await dao.findAllItems();
     setState(() {
-      if(_counter<99.0)
-        _counter++;
+      _items = list;
     });
+  }
+
+  void _addItem() async {
+    final name = _itemController.text.trim();
+    final qty = int.tryParse(_quantityController.text.trim()) ?? 1;
+
+    if (name.isEmpty) return;
+
+    final newItem = ToDoItem(ToDoItem.ID++, name, qty);
+    await database.toDoDao.insertItem(newItem);
+
+    setState(() {
+      _items.add(newItem);
+      _itemController.clear();
+      _quantityController.clear();
+    });
+  }
+
+  void _confirmDelete(ToDoItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Delete Item"),
+        content: Text("Do you want to delete '${item.item}'?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text("No"),
+          ),
+          TextButton(
+            onPressed: () async {
+              await database.toDoDao.deleteItem(item);
+              setState(() {
+                _items.remove(item);
+              });
+              Navigator.pop(ctx);
+            },
+            child: Text("Yes"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
+      appBar: AppBar(title: Text("To-Do List")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('Welcome to CST2335',  style:TextStyle(letterSpacing: 5.0,fontSize: 30.0, color:Colors.blue ) ),
-            Text('$_counter',  style: Theme.of(context).textTheme.headlineMedium,),
-
-            Semantics(child: Image.asset("images/algonquin.jpg", width: 200,height:200),
-              label:"This is an image of Algonquin college"   ),
-
-            ElevatedButton( onPressed: () {
-              _controller.text = "You clicked the button";
-
-            },  //<-----lambda function
-                child:  Image.asset("images/algonquin.jpg", width: 200, height:200)  ),
-
-            Checkbox(value: isChecked,
-                onChanged: ( newVal ) {
-                if(newVal != null)
-                  setState(() {//update the GUI
-                    isChecked = newVal; //store the new value
-                  });
-                }),
-            Switch(value:isChecked,
-              onChanged: (newVal){
-                  if(newVal!= null)
-                    setState(() {
-                      isChecked = newVal;
-                    });
-              }),
-            TextField(controller: _controller,
-                decoration: InputDecoration(
-                    hintText:"Type here",
-                    border: OutlineInputBorder(),
-                    labelText: "First name"
-                )),
+          children: [
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _itemController,
+                  decoration: InputDecoration(hintText: "Item"),
+                ),
+              ),
+              SizedBox(width: 5),
+              Expanded(
+                child: TextField(
+                  controller: _quantityController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(hintText: "Qty"),
+                ),
+              ),
+              ElevatedButton(onPressed: _addItem, child: Text("Add"))
+            ]),
+            SizedBox(height: 16),
+            Expanded(
+              child: _items.isEmpty
+                  ? Center(child: Text("No items"))
+                  : ListView.builder(
+                itemCount: _items.length,
+                itemBuilder: (ctx, i) {
+                  final item = _items[i];
+                  return ListTile(
+                    title: Text(item.item),
+                    subtitle: Text("Qty: ${item.quantity}"),
+                    onLongPress: () => _confirmDelete(item),
+                  );
+                },
+              ),
+            )
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
     );
-  }
-
-  void setNewValue(double value)
-  {
-    setState(() {
-      _counter = value;
-    }); //update the GUI to new values
-  }
-
-
-  void buttonClicked(){
-
   }
 }

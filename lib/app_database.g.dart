@@ -120,7 +120,7 @@ class _$ToDoDao extends ToDoDao {
             'ToDoItem',
             (ToDoItem item) => <String, Object?>{
                   'id': item.id,
-                  'item': item.item,
+                  'item': item.name,
                   'quantity': item.quantity
                 }),
         _toDoItemDeletionAdapter = DeletionAdapter(
@@ -129,7 +129,7 @@ class _$ToDoDao extends ToDoDao {
             ['id'],
             (ToDoItem item) => <String, Object?>{
                   'id': item.id,
-                  'item': item.item,
+                  'item': item.name,
                   'quantity': item.quantity
                 });
 
